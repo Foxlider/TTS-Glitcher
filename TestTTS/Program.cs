@@ -6,7 +6,7 @@ using System.Media;
 using System.Speech.Synthesis;
 using System.Threading.Tasks;
 
-namespace TestTTS
+namespace TTSGlitcher
 {
     class Program
     {
@@ -74,10 +74,33 @@ namespace TestTTS
             #endregion
 
             #region Glitching the stream
+            MemoryStream msLQ = new MemoryStream();
+            while (true) //Low Quality pass
+            {
+                var buffer    = new byte[BlockSize];
+                var byteCount = await stream.ReadAsync(buffer, 0, BlockSize);
+                if (byteCount == 0) { break; }
+                var strm = new MemoryStream();
+                bool passing = true;
+                for (int i = 0; i < buffer.Length; i += 2)
+                {
+                    if (passing)
+                    {
+                        strm.WriteByte(buffer[i]);
+                        strm.WriteByte(buffer[i + 1]);
+                        strm.WriteByte(buffer[i]);
+                        strm.WriteByte(buffer[i + 1]);
+                    }
+                    passing = !passing;
+                }
+                await msLQ.WriteAsync(strm.ToArray(), 0, (int)strm.Length);
+            }
+            ms.Position = header.Length;
+            msLQ.Position = header.Length;
             while (true) //Copy stream to memorystream (to glitch it eventually)
             {
                 var       buffer    = new byte[BlockSize];
-                var       byteCount = await stream.ReadAsync(buffer, 0, BlockSize);
+                var       byteCount = await msLQ.ReadAsync(buffer, 0, BlockSize);
                 if (byteCount == 0) { break; }
                 await Glitcher(ms, buffer, byteCount, bitsPerSample);
                 //await ms.WriteAsync(buffer, 0, byteCount);
@@ -111,6 +134,7 @@ namespace TestTTS
             var player = new SoundPlayer(ms); //Play the audio stream
             player.PlaySync();
             #endregion 
+
             Console.WriteLine();
             Console.WriteLine("Press any key to continue...");
             Console.ReadKey();
@@ -129,41 +153,95 @@ namespace TestTTS
             var strm = new MemoryStream();
             switch (_r.Next(20))
             {
+                #region G1
                 case 1:
+                case 2:
                 case 3:
-                    //strm.Write(buffer, 0, byteCount);
-                    //Console.WriteLine("G1");
-                    //var initBytes = byteCount;
-                    //var loops = _r.Next(10);
-                    //for (var i = 0; i < loops; i++)
-                    //{
-                    //    strm.Write(buffer, 0, initBytes);
-                    //    byteCount += initBytes;
-                    //    Console.WriteLine($"Looped and created  a buffer {strm.Length} ({byteCount}) == {strm.ToArray().Length}");
-                    //}
-                    Console.WriteLine("G1");
-                    //byte[] frag = buffer.Take((int)(buffer.Length * 0.20)).ToArray();
-                    byte[] frag = buffer.Take(2756).ToArray();
-                    var loops = _r.Next(2, 10);
+                case 4:
+                    
+                    int fragLen = buffer.Length / 8;
+                    byte[] frag = buffer.Take(fragLen).ToArray();
+                    //byte[] frag = buffer.Take(2756).ToArray();
+                    var loops = _r.Next(3, 10);
                     for (var i = 0; i <= loops; i++)
                     {
                         strm.Write(frag, 0, frag.Length);
-                        Console.WriteLine($"Looped and created  a buffer {strm.Length} ({frag.Length}) == {strm.ToArray().Length}");
+                        //Console.WriteLine($"Looped and created  a buffer {strm.Length} ({frag.Length}) == {strm.ToArray().Length}");
                     }
-                    byte[] endFrag = buffer.ToList().GetRange(2756, buffer.Length - 2756).ToArray();
+                    Console.WriteLine($"G1 ({loops} loops)");
+                    byte[] endFrag = buffer.ToList().GetRange(fragLen, buffer.Length - fragLen).ToArray();
                     strm.Write(endFrag, 0, endFrag.Length);
                     break;
-                case 2:
-                    Console.WriteLine("G2");
-                    for (int i = 0; i < buffer.Length; i+=2)
+                #endregion
+
+                //#region G2
+                //case 4:
+                //    Console.WriteLine("G2");
+                //    for (int i = 0; i < buffer.Length; i += 2)
+                //    {
+                //        strm.WriteByte(buffer[i]);
+                //        strm.WriteByte(buffer[i + 1]);
+                //        strm.WriteByte(buffer[i]);
+                //        strm.WriteByte(buffer[i + 1]);
+                //    }
+                //    byteCount = (int)strm.Length;
+                //    break;
+                //#endregion
+
+                #region G4
+                case 5:
+                case 6:
+                    Console.WriteLine("G4");
+                    for (int i = 0; i < buffer.Length; i += 2)
                     {
-                        strm.WriteByte(buffer[i]);
-                        strm.WriteByte(buffer[i+1]);
-                        strm.WriteByte(buffer[i]);
-                        strm.WriteByte(buffer[i + 1]);
+                        switch (_r.Next(3))
+                        {
+                            case 1:
+                                strm.WriteByte(buffer[i]);
+                                strm.WriteByte(buffer[i + 1]);
+                                strm.WriteByte(buffer[i]);
+                                strm.WriteByte(buffer[i + 1]);
+                                break;
+                            case 2:
+                                strm.WriteByte(buffer[i]);
+                                strm.WriteByte(buffer[i + 1]);
+                                strm.WriteByte(buffer[i]);
+                                strm.WriteByte(buffer[i + 1]);
+                                strm.WriteByte(buffer[i]);
+                                strm.WriteByte(buffer[i + 1]);
+                                break;
+                                //case 0 or 3 just skips a value because lulz
+                        }
                     }
-                    byteCount = (int)strm.Length;
                     break;
+                #endregion
+
+                #region G5
+                case 7:
+                case 8:
+                case 9:
+                case 10:
+                    Console.WriteLine("G5");
+                    bool passing = true;
+                    for (int i = 0; i < buffer.Length; i += 2)
+                    {
+                        if (passing)
+                        {
+                            strm.WriteByte(buffer[i]);
+                            strm.WriteByte(buffer[i + 1]);
+                            strm.WriteByte(buffer[i]);
+                            strm.WriteByte(buffer[i + 1]);
+                            strm.WriteByte(buffer[i]);
+                            strm.WriteByte(buffer[i + 1]);
+                            strm.WriteByte(buffer[i]);
+                            strm.WriteByte(buffer[i + 1]);
+                        }
+                        else { i += 4; }
+                        passing = !passing;
+                    }
+                    break;
+                #endregion
+
                 default:
                     strm.Write(buffer, 0, byteCount);
                     break;
